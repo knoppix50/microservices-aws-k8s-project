@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db-postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db-postgres
+  template:
+    metadata:
+      labels:
+        app: db-postgres
+    spec:
+      containers:
+      - name: postgres
+        image: db-postgress:latest  # La imagen con tus 3 scripts .sql
+        imagePullPolicy: Never       # Obliga a Minikube a usar la imagen local
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_USER
+          value: "postgres"
+        - name: POSTGRES_PASSWORD
+          value: "password123"
+        - name: POSTGRES_DB
+          value: "postgres"          # Base por defecto configurada en config.py
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db-postgres                  # Nombre de red interno en el clúster
+spec:
+  ports:
+  - port: 5432
+  selector:
+    app: db-postgres
+
