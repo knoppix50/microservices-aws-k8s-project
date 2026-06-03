@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-analytics-service
+  labels:
+    app: api-analytics-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-analytics-service
+  template:
+    metadata:
+      labels:
+        app: api-analytics-service
+    spec:
+      containers:
+      - name: analytics-api
+        # Usamos la imagen que estás compilando en este momento
+        image: api-analytics-service:latest
+        # Le dice a K8s que use la imagen local de Minikube sin intentar buscarla en internet
+        imagePullPolicy: Never 
+        ports:
+        - containerPort: 5153
+        # Aquí le pasamos los datos de conexión a la base de datos
+        env:
+        - name: DB_HOST
+          value: "mi-postgres-postgresql.default.svc.cluster.local"
+        - name: DB_PORT
+          value: "5432"
+        - name: DB_NAME
+          value: "postgres"
+        - name: DB_USERNAME
+          value: "postgres"
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mi-postgres-postgresql
+              key: postgres-password
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-analytics-service
+spec:
+  type: NodePort
+  ports:
+  - port: 5153        # Puerto del servicio
+    targetPort: 5153  # Puerto del contenedor
+    nodePort: 30005   # El puerto externo que te pide el profesor
+  selector:
+    app: api-analytics-service
+
