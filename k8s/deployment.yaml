@@ -25,7 +25,7 @@ spec:
         # Aquí le pasamos los datos de conexión a la base de datos
         env:
         - name: DB_HOST
-          value: "mi-postgres-postgresql.default.svc.cluster.local"
+          value: "postgres-db-postgresql.default.svc.cluster.local"
         - name: DB_PORT
           value: "5432"
         - name: DB_NAME
@@ -35,7 +35,7 @@ spec:
         - name: DB_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: mi-postgres-postgresql
+              name: postgres-db-postgresql
               key: postgres-password
 ---
 apiVersion: v1

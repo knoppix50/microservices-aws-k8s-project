@@ -1,0 +1,27 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo "=== PRE-BUILD PHASE: Logging into AWS ECR ==="
+      # Authenticate Docker client against the AWS ECR private registry
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_://amazonaws.com
+      # Define environment variables to comply with required semantic versioning
+      - REPO_URL=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_://amazonaws.com/$IMAGE_REPO_NAME
+      - IMAGE_TAG="1.0.0"
+
+  build:
+    commands:
+      - echo "=== BUILD PHASE: Compiling the Docker image ==="
+      # Build the Docker image targeting the analytics directory context
+      - docker build -t $IMAGE_REPO_NAME:$IMAGE_TAG analytics/
+      # Tag the image with the full AWS ECR remote repository URL
+      - docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $REPO_URL:$IMAGE_TAG
+
+  post_build:
+    commands:
+      - echo "=== POST-BUILD PHASE: Pushing the Docker image to AWS ECR ==="
+      # Push the semantic-versioned image to the AWS cloud registry
+      - docker push $REPO_URL:$IMAGE_TAG
+      - echo "=== BUILD AND DEPLOYMENT SUCCESSFUL FOR VERSION $IMAGE_TAG ==="
+
