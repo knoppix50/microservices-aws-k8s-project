@@ -1,5 +1,5 @@
-# Use a lightweight, official Python base image to reduce vulnerabilities
-FROM python:3.10-slim
+# Use an official, public Amazon ECR Python base image to bypass Docker Hub rate limits
+FROM public.ecr.aws/docker/library/python:3.10-slim
 
 # Install essential system packages to enable the compilation of native PostgreSQL dependencies.
 RUN apt-get update && apt-get install -y \
