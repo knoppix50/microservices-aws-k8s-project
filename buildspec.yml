@@ -9,20 +9,17 @@ version: 0.2
 phases:
   pre_build:
     commands:
-      - "echo '=== PRE-BUILD PHASE: Logging into AWS ECR ==='"
-      - "aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_://amazonaws.com"
-      - "REPO_URL=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_://amazonaws.com/$IMAGE_REPO_NAME"
-      - "IMAGE_TAG='1.0.0'"
-
+      - echo Logging into ECR
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
   build:
     commands:
-      - "echo '=== BUILD PHASE: Compiling the Docker image ==='"
-      - "docker build -t $IMAGE_REPO_NAME:$IMAGE_TAG analytics/"
-      - "docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $REPO_URL:$IMAGE_TAG"
-
+      - echo Starting build at `date`
+      - echo Building the Docker image...          
+      - docker build -t $IMAGE_REPO_NAME:$CODEBUILD_BUILD_NUMBER analytics/
+      - docker tag $IMAGE_REPO_NAME:$CODEBUILD_BUILD_NUMBER $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$CODEBUILD_BUILD_NUMBER      
   post_build:
     commands:
-      - "echo '=== POST-BUILD PHASE: Pushing the Docker image to AWS ECR ==='"
-      - "docker push $REPO_URL:$IMAGE_TAG"
-      - "echo '=== BUILD AND DEPLOYMENT SUCCESSFUL FOR VERSION $IMAGE_TAG ==='"
+      - echo Completed build at `date`
+      - echo Pushing the Docker image...
+      - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$CODEBUILD_BUILD_NUMBER
 
