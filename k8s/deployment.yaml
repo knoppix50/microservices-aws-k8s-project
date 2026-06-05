@@ -16,13 +16,11 @@ spec:
     spec:
       containers:
       - name: analytics-api
-        # Usamos la imagen que estás compilando en este momento
         image: api-analytics-service:latest
-        # Le dice a K8s que use la imagen local de Minikube sin intentar buscarla en internet
-        imagePullPolicy: Never 
+        imagePullPolicy: Never
         ports:
         - containerPort: 5153
-        # Aquí le pasamos los datos de conexión a la base de datos
+        # Database data connection
         env:
         - name: DB_HOST
           value: "postgres-db-postgresql.default.svc.cluster.local"
@@ -45,9 +43,9 @@ metadata:
 spec:
   type: NodePort
   ports:
-  - port: 5153        # Puerto del servicio
-    targetPort: 5153  # Puerto del contenedor
-    nodePort: 30005   # El puerto externo que te pide el profesor
+  - port: 5153        # Service port
+    targetPort: 5153  # Container port
+    nodePort: 30005   # External port
   selector:
     app: api-analytics-service
 
