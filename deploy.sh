@@ -97,11 +97,11 @@ try_command "kubectl apply -f aws-eks-app-deploy/coworking.yaml" "Deploy Python 
 # BLOCK 4: FINAL SYSTEM VERIFICATION
 # ---------------------------------------------------------------------
 echo -e "${YELLOW}=== BLOCK 4: FINAL CLUSTER HEALTH CHECK ===${NC}"
-echo -e "Waiting 15 seconds for final cluster stabilization..."
-sleep 15
+echo -e "Waiting 120 seconds for final cluster stabilization..."
+sleep 120
 
 echo -e "${GREEN}=== CURRENT DEPLOYMENT STATUS ===${NC}"
-kubectl get deployments,pods,svc,pvc
+kubectl get pvc,pods,deployments,svc
 
 echo -e "\n${GREEN}Congratulations! The entire project has been deployed 100% automated without errors.${NC}"
 

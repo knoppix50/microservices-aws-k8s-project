@@ -68,8 +68,8 @@ try_destroy "kubectl delete -f aws-eks-db-deploy/pv.yaml --ignore-not-found" "St
 # FINAL CLEANUP VERIFICATION
 # ---------------------------------------------------------------------
 echo -e "${YELLOW}=== FINAL RESIDUAL CHECK ===${NC}"
-echo -e "Waiting 10 seconds for Kubernetes to sync deletions..."
-sleep 10
+echo -e "Waiting 30 seconds for Kubernetes to sync deletions..."
+sleep 30
 
 # Security force-purge in case some pods hang in 'Terminating' status due to finalizers
 echo "Verifying no ghost pods are left..."
@@ -80,7 +80,8 @@ if [ ! -z "$PODS_LEFT" ]; then
 fi
 
 echo -e "\n${GREEN}=== CURRENT CLUSTER STATUS (SHOULD BE EMPTY) ===${NC}"
-kubectl get deployments,pods,svc,pvc,pv
+
+kubectl get svc,deployments,pods,pvc,pv
 
 echo -e "\n${GREEN}Done! Cluster is completely clean and free of charges. Flawless execution!${NC}"
 

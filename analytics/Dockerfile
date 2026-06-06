@@ -22,5 +22,8 @@ COPY . .
 # Inform Docker that the container internally exposes port 5153
 EXPOSE 5153
 
+# Disable Python buffering so that logs are sent to CloudWatch in real time
+ENV PYTHONUNBUFFERED=1
+
 # Default command to initialize the API when starting the container
 CMD ["python", "app.py"]

@@ -16,7 +16,7 @@ echo -e "${YELLOW}Extracting Load Balancer DNS hostname from AWS EKS...${NC}"
 # Loop until Kubernetes receives the external DNS hostname from AWS Load Balancer
 while true; do
   # Query the specific service for its external ingress hostname
-  LB_HOSTNAME=$(kubectl get svc coworking -o jsonpath='{.status.loadBalancer.ingress.hostname}' 2>/dev/null)
+  LB_HOSTNAME=$(kubectl get svc coworking -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
   
   if [ ! -z "$LB_HOSTNAME" ]; then
     # Dynamically build the target URL using the application port 5153
