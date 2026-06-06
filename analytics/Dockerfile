@@ -22,11 +22,5 @@ COPY . .
 # Inform Docker that the container internally exposes port 5153
 EXPOSE 5153
 
-# Disable Python buffering so that logs are sent to CloudWatch in real time
-ENV PYTHONUNBUFFERED=1
-ENV OTEL_SDK_DISABLED=true
-ENV OTEL_METRICS_EXPORTER=none
-ENV OTEL_TRACES_EXPORTER=none
-
 # Default command to initialize the API when starting the container
 CMD ["python", "app.py"]
