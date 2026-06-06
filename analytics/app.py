@@ -1,8 +1,5 @@
 import os
-os.environ["OTEL_SDK_DISABLED"] = "true"
-os.environ["OTEL_EXPERIMENTAL_RESOURCE_DETECTORS"] = "none"
 import logging
-
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timedelta
