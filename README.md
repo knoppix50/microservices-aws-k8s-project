@@ -66,3 +66,4 @@ Permanently destroy the underlying cloud control plane and infrastructure to sto
 *   **Semantic Versioning**: Images are pushed to private **AWS ECR (Elastic Container Registry)** using discrete `$IMAGE_TAG` parameters. Application updates trigger progressive *Rolling Updates* in the clúster topology ensuring zero downtime.
 *   **High-Availability Scaling**: While a single worker node (`t3.small`) architecture is utilized for cost-sensitive evaluation via host storage, high-throughput production environments scale dynamically across multiple Availability Zones using the **AWS EBS CSI Driver** paired with elastic network block storages.
 
+# Cambio de prueba
