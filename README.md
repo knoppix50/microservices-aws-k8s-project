@@ -1,131 +1,68 @@
-# Coworking Space Service Extension
-The Coworking Space Service is a set of APIs that enables users to request one-time tokens and administrators to authorize access to a coworking space. This service follows a microservice pattern and the APIs are split into distinct services that can be deployed and managed independently of one another.
+# Microservices Deployment Pipeline on AWS EKS
 
-For this project, you are a DevOps engineer who will be collaborating with a team that is building an API for business analysts. The API provides business analysts basic analytics data on user activity in the service. The application they provide you functions as expected locally and you are expected to help build a pipeline to deploy it in Kubernetes.
+This repository contains the containerization, continuous integration, and fully automated deployment architecture for a Python-based analytics microservice and a persistent Postgres SQL database deployed on **Amazon EKS (Elastic Kubernetes Service)**.
 
-## Getting Started
+---
 
-### Dependencies
-#### Local Environment
-1. Python Environment - run Python 3.6+ applications and install Python dependencies via `pip`
-2. Docker CLI - build and run Docker images locally
-3. `kubectl` - run commands against a Kubernetes cluster
-4. `helm` - apply Helm Charts to a Kubernetes cluster
+## 1. Repository Structure
 
-#### Remote Resources
-1. AWS CodeBuild - build Docker images remotely
-2. AWS ECR - host Docker images
-3. Kubernetes Environment with AWS EKS - run applications in k8s
-4. AWS CloudWatch - monitor activity and logs in EKS
-5. GitHub - pull and clone code
+The project layout is structured as follows:
 
-### Setup
-#### 1. Configure a Database
-Set up a Postgres database using a Helm Chart.
+*   **`analytics/`**: Source code of the Python API microservice, including its dependencies (`requirements.txt`) and multi-stage `Dockerfile`.
+*   **`aws-eks-app-deploy/`**: Kubernetes declarative manifests (`coworking.yaml`, `configmap.yaml`, `secret.yaml`) for the application layer.
+*   **`aws-eks-db-deploy/`**: Kubernetes database manifests containing deployment, networking, and volume storage settings (`pvc.yaml`, `pv.yaml`).
+*   **`db/`**: Alphabetically ordered database migration and seed scripts executed automatically during initial database provisioning.
+*   **`buildspec.yml`**: AWS CodeBuild pipeline configuration specification for CI container tagging based on Semantic Versioning.
+*   **Automation Scripts**: Production-ready Bash utilities handling orchestration, dynamic health checks, endpoint testing, and cluster teardown.
 
-1. Set up Bitnami Repo
+---
+
+## 2. Infrastructure & Automation Workflow
+
+The deployment cycle is orchestrated using four specialized shell scripts to eliminate manual operations and ensure zero configuration drift:
+
+### Phase 1: Environment Provisioning
+Initialize the AWS EKS control plane and worker nodes, install logging telemetry, and assign policies:
 ```bash
-helm repo add <REPO_NAME> https://charts.bitnami.com/bitnami
+./install-infra.sh
 ```
+*   **Mechanics**: Executes `eksctl` to provision a single-node cluster architecture. It dynamically grabs the generated worker node IAM role ARN, attaches the native `CloudWatchAgentServerPolicy`, and installs the `amazon-cloudwatch-observability` addon for deep cluster telemetry metrics.
 
-2. Install PostgreSQL Helm Chart
-```
-helm install <SERVICE_NAME> <REPO_NAME>/postgresql
-```
-
-This should set up a Postgre deployment at `<SERVICE_NAME>-postgresql.default.svc.cluster.local` in your Kubernetes cluster. You can verify it by running `kubectl svc`
-
-By default, it will create a username `postgres`. The password can be retrieved with the following command:
+### Phase 2: Orchestrated Microservices Deployment
+Deploy the persistent database layer and self-seed initial mock data records before scheduling the stateless API:
 ```bash
-export POSTGRES_PASSWORD=$(kubectl get secret --namespace default <SERVICE_NAME>-postgresql -o jsonpath="{.data.postgres-password}" | base64 -d)
-
-echo $POSTGRES_PASSWORD
+./deploy.sh
 ```
+*   **Mechanics**: Implements a Java-like `try/catch` execution handler. It provisions the `PersistentVolume` configurations, dynamically streams the `db/` SQL scripts into an ephemeral `ConfigMap` to bypass the `kubectl.kubernetes.io/last-applied-configuration` metadata size limit (256KB), and binds it to `/docker-entrypoint-initdb.d`. 
+*   **Readiness Probes**: Loops health diagnostics until the Postgres process reports `Running`, enforces a security cooldown to complete the 3,500 record insertions sequentially, and subsequently updates the application pods (`coworking`).
 
-<sup><sub>* The instructions are adapted from [Bitnami's PostgreSQL Helm Chart](https://artifacthub.io/packages/helm/bitnami/postgresql).</sub></sup>
-
-3. Test Database Connection
-The database is accessible within the cluster. This means that when you will have some issues connecting to it via your local environment. You can either connect to a pod that has access to the cluster _or_ connect remotely via [`Port Forwarding`](https://kubernetes.io/docs/tasks/access-application-cluster/port-forward-access-application-cluster/)
-
-* Connecting Via Port Forwarding
+### Phase 3: Dynamic Integration Testing
+Verify complete microservice communication, database networking, and request processing metrics:
 ```bash
-kubectl port-forward --namespace default svc/<SERVICE_NAME>-postgresql 5432:5432 &
-    PGPASSWORD="$POSTGRES_PASSWORD" psql --host 127.0.0.1 -U postgres -d postgres -p 5432
+./test-api.sh
 ```
+*   **Mechanics**: Queries the live Kubernetes API via `jsonpath` to extract the dynamically assigned AWS Elastic Load Balancer (ELB) external DNS hostname. It automates health checking over the network and performs end-to-end `curl` integration tests against `/api/reports/user_visits` and `/api/reports/daily_usage`, validating HTTP 200 response codes and payload structures.
 
-* Connecting Via a Pod
+### Phase 4: Application Cleanup
+Safely destroy deployed resources to prevent unexpected cloud computing storage charges:
 ```bash
-kubectl exec -it <POD_NAME> bash
-PGPASSWORD="<PASSWORD HERE>" psql postgres://postgres@<SERVICE_NAME>:5432/postgres -c <COMMAND_HERE>
+./destroy.sh
 ```
+*   **Mechanics**: Performs inverse cascade deletion. Purges application deployments, database pods, configurations, and network endpoints using `--ignore-not-found` flags. It intercepts and purges zombie processes hung in `Terminating` states due to resource finalizers by sending immediate force-deletion signals.
 
-4. Run Seed Files
-We will need to run the seed files in `db/` in order to create the tables and populate them with data.
 
+### Phase 5: Cluster Teardown (Final Destruction)
+Permanently destroy the underlying cloud control plane and infrastructure to stop AWS billing:
 ```bash
-kubectl port-forward --namespace default svc/<SERVICE_NAME>-postgresql 5432:5432 &
-    PGPASSWORD="$POSTGRES_PASSWORD" psql --host 127.0.0.1 -U postgres -d postgres -p 5432 < <FILE_NAME.sql>
+./delete-cluster.sh
 ```
+*   **Mechanics**: Prompts the administrator for an explicit `YES` security confirmation before triggering `eksctl delete cluster`. It safely de-provisions the Amazon EC2 worker nodes, removes associated IAM roles, tears down the cloud virtual network (VPC), and outputs a final green success confirmation once AWS registers the complete infrastructure purge.
 
-### 2. Running the Analytics Application Locally
-In the `analytics/` directory:
+---
 
-1. Install dependencies
-```bash
-pip install -r requirements.txt
-```
-2. Run the application (see below regarding environment variables)
-```bash
-<ENV_VARS> python app.py
-```
+## 3. DevOps Architecture Recommendations
 
-There are multiple ways to set environment variables in a command. They can be set per session by running `export KEY=VAL` in the command line or they can be prepended into your command.
+*   **Resource Constraints**: Microservices explicitly declare compute boundaries within Kubernetes definitions (`requests`/`limits`) to maintain pod scheduling stability and eliminate node resource starvation.
+*   **Semantic Versioning**: Images are pushed to private **AWS ECR (Elastic Container Registry)** using discrete `$IMAGE_TAG` parameters. Application updates trigger progressive *Rolling Updates* in the clúster topology ensuring zero downtime.
+*   **High-Availability Scaling**: While a single worker node (`t3.small`) architecture is utilized for cost-sensitive evaluation via host storage, high-throughput production environments scale dynamically across multiple Availability Zones using the **AWS EBS CSI Driver** paired with elastic network block storages.
 
-* `DB_USERNAME`
-* `DB_PASSWORD`
-* `DB_HOST` (defaults to `127.0.0.1`)
-* `DB_PORT` (defaults to `5432`)
-* `DB_NAME` (defaults to `postgres`)
-
-If we set the environment variables by prepending them, it would look like the following:
-```bash
-DB_USERNAME=username_here DB_PASSWORD=password_here python app.py
-```
-The benefit here is that it's explicitly set. However, note that the `DB_PASSWORD` value is now recorded in the session's history in plaintext. There are several ways to work around this including setting environment variables in a file and sourcing them in a terminal session.
-
-3. Verifying The Application
-* Generate report for check-ins grouped by dates
-`curl <BASE_URL>/api/reports/daily_usage`
-
-* Generate report for check-ins grouped by users
-`curl <BASE_URL>/api/reports/user_visits`
-
-## Project Instructions
-1. Set up a Postgres database with a Helm Chart
-2. Create a `Dockerfile` for the Python application. Use a base image that is Python-based.
-3. Write a simple build pipeline with AWS CodeBuild to build and push a Docker image into AWS ECR
-4. Create a service and deployment using Kubernetes configuration files to deploy the application
-5. Check AWS CloudWatch for application logs
-
-### Deliverables
-1. `Dockerfile`
-2. Screenshot of AWS CodeBuild pipeline
-3. Screenshot of AWS ECR repository for the application's repository
-4. Screenshot of `kubectl get svc`
-5. Screenshot of `kubectl get pods`
-6. Screenshot of `kubectl describe svc <DATABASE_SERVICE_NAME>`
-7. Screenshot of `kubectl describe deployment <SERVICE_NAME>`
-8. All Kubernetes config files used for deployment (ie YAML files)
-9. Screenshot of AWS CloudWatch logs for the application
-10. `README.md` file in your solution that serves as documentation for your user to detail how your deployment process works and how the user can deploy changes. The details should not simply rehash what you have done on a step by step basis. Instead, it should help an experienced software developer understand the technologies and tools in the build and deploy process as well as provide them insight into how they would release new builds.
-
-
-### Stand Out Suggestions
-Please provide up to 3 sentences for each suggestion. Additional content in your submission from the standout suggestions do _not_ impact the length of your total submission.
-1. Specify reasonable Memory and CPU allocation in the Kubernetes deployment configuration
-2. In your README, specify what AWS instance type would be best used for the application? Why?
-3. In your README, provide your thoughts on how we can save on costs?
-
-### Best Practices
-* Dockerfile uses an appropriate base image for the application being deployed. Complex commands in the Dockerfile include a comment describing what it is doing.
-* The Docker images use semantic versioning with three numbers separated by dots, e.g. `1.2.1` and  versioning is visible in the  screenshot. See [Semantic Versioning](https://semver.org/) for more details.

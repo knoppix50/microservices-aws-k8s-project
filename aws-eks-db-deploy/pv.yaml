@@ -8,7 +8,7 @@ spec:
   accessModes:
     - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
-  storageClassName: gp2
+  storageClassName: manual
   hostPath:
     path: "/mnt/data"
 

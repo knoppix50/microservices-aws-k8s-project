@@ -3,7 +3,7 @@ kind: PersistentVolumeClaim
 metadata:
   name: postgresql-pvc
 spec:
-  storageClassName: gp2
+  storageClassName: manual
   accessModes:
     - ReadWriteOnce
   resources:
