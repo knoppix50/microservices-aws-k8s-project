@@ -1,0 +1,3 @@
+This command creates a configmap to inject .sql scripts when the PostgreSQL pod starts. It's very useful for avoiding having to inject them manually:
+
+kubectl create configmap postgres-init-script --from-file=db/ --dry-run=client -o yaml > postgres-configmap.yaml
