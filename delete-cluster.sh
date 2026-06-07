@@ -19,6 +19,26 @@ read -r CONFIRMATION
 
 if [ "$CONFIRMATION" == "YES" ]; then
   echo -e "\n${YELLOW}--> Confirmation approved. Initiating AWS EKS cluster teardown...${NC}"
+  
+  # ---------------------------------------------------------------------
+  # PHASE 0: CLEANUP EXTERNAL IAM POLICIES (Prevents CloudFormation lock)
+  # ---------------------------------------------------------------------
+  echo -e "${BLUE}[1/2] Detaching CloudWatch policies from Node Group to avoid deletion locks...${NC}"
+  NODE_ROLE_ARN=$(aws eks describe-nodegroup --cluster-name my-cluster --nodegroup-name my-nodes --query "nodegroup.nodeRole" --output text 2>/dev/null)
+  
+  if [ ! -z "$NODE_ROLE_ARN" ] && [ "$NODE_ROLE_ARN" != "None" ]; then
+    ROLE_NAME=$(echo $NODE_ROLE_ARN | cut -d'/' -f2)
+    aws iam detach-role-policy --role-name "$ROLE_NAME" --policy-arn arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy 2>/dev/null
+    echo -e "${GREEN}[OK] IAM Node Group role isolated successfully.${NC}\n"
+  else
+    echo -e "${YELLOW}[INFO] Node Group role not found or already deleted. Proceeding...${NC}\n"
+  fi
+
+sleep 45
+  # ---------------------------------------------------------------------
+  # PHASE 1: INFRASTRUCTURE PURGE
+  # ---------------------------------------------------------------------
+  echo -e "${RED}[2/2] Launching cluster destruction via eksctl...${NC}"
   echo -e "${YELLOW}Note: This process takes around 15 minutes. Please wait...${NC}\n"
   
   # Execute the blocking eksctl deletion command

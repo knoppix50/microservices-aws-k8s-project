@@ -18,45 +18,61 @@ The project layout is structured as follows:
 ---
 
 ## 2. Infrastructure & Automation Workflow
-
-The deployment cycle is orchestrated using four specialized shell scripts to eliminate manual operations and ensure zero configuration drift:
+The deployment cycle is split into independent, single-purpose scripts. This modular approach prevents AWS IAM propagation delays and optimizes execution within the limited lifespan of federated session tokens.
 
 ### Phase 1: Environment Provisioning
-Initialize the AWS EKS control plane and worker nodes, install logging telemetry, and assign policies:
+Initialize the AWS EKS control plane and worker nodes without telemetry attachments:
 ```bash
 ./install-infra.sh
 ```
-*   **Mechanics**: Executes `eksctl` to provision a single-node cluster architecture. It dynamically grabs the generated worker node IAM role ARN, attaches the native `CloudWatchAgentServerPolicy`, and installs the `amazon-cloudwatch-observability` addon for deep cluster telemetry metrics.
+*   **Mechanics**: Executes `eksctl` to provision a single-node cluster architecture and creates the underlying Node Group CloudFormation stack.
+
 
 ### Phase 2: Orchestrated Microservices Deployment
-Deploy the persistent database layer and self-seed initial mock data records before scheduling the stateless API:
+Deploy the persistent database layer, execute seeding scripts, and schedule the stateless Python API:
 ```bash
 ./deploy.sh
 ```
-*   **Mechanics**: Implements a Java-like `try/catch` execution handler. It provisions the `PersistentVolume` configurations, dynamically streams the `db/` SQL scripts into an ephemeral `ConfigMap` to bypass the `kubectl.kubernetes.io/last-applied-configuration` metadata size limit (256KB), and binds it to `/docker-entrypoint-initdb.d`. 
-*   **Readiness Probes**: Loops health diagnostics until the Postgres process reports `Running`, enforces a security cooldown to complete the 3,500 record insertions sequentially, and subsequently updates the application pods (`coworking`).
+*   **Mechanics**: Provisions `PersistentVolume` resources, injects SQL migration scripts via a `ConfigMap` to bypass metadata size limits, and schedules the application pods (`coworking`).
+
 
 ### Phase 3: Dynamic Integration Testing
-Verify complete microservice communication, database networking, and request processing metrics:
+Generate live network traffic and verify microservice endpoint communication:
 ```bash
 ./test-api.sh
 ```
-*   **Mechanics**: Queries the live Kubernetes API via `jsonpath` to extract the dynamically assigned AWS Elastic Load Balancer (ELB) external DNS hostname. It automates health checking over the network and performs end-to-end `curl` integration tests against `/api/reports/user_visits` and `/api/reports/daily_usage`, validating HTTP 200 response codes and payload structures.
+*   **Mechanics**: Extracts the dynamic AWS Elastic Load Balancer (ELB) DNS hostname via `jsonpath` and runs automated `curl` tests against `/api/reports/` to validate HTTP 200 responses.
 
-### Phase 4: Application Cleanup
-Safely destroy deployed resources to prevent unexpected cloud computing storage charges:
+
+### Phase 4: CloudWatch Telemetry Installation
+Install cluster observability only after verifying that the application layer is stable and active:
+```bash
+./install-cloudwatch.sh
+```
+* **Mechanics**: Dynamically fetches the active worker node IAM role ARN from CloudFormation, attaches the `CloudWatchAgentServerPolicy`, and deploys the `amazon-cloudwatch-observability` addon.
+
+
+### Phase 5: Log Verification & Maintenance
+Manually verify data ingestion in the AWS Management Console:
+1. Navigate to **CloudWatch** > **Logs** > **Log groups**.
+2. Select `/aws/containerinsights/<cluster-name>/application`.
+3. Inspect active Log Streams to confirm receipt of Flask microservice container logs.
+
+
+### Phase 6: Application Cleanup
+Safely destroy deployed application resources to clean the Kubernetes state:
 ```bash
 ./destroy.sh
 ```
-*   **Mechanics**: Performs inverse cascade deletion. Purges application deployments, database pods, configurations, and network endpoints using `--ignore-not-found` flags. It intercepts and purges zombie processes hung in `Terminating` states due to resource finalizers by sending immediate force-deletion signals.
+*   **Mechanics**: Performs an inverse cascade deletion of application deployments, database pods, and network services using `--ignore-not-found` flags.
 
 
-### Phase 5: Cluster Teardown (Final Destruction)
-Permanently destroy the underlying cloud control plane and infrastructure to stop AWS billing:
+### Phase 7: Cluster Teardown (Final Destruction)
+Permanently destroy cloud infrastructure to stop AWS billing before token expiration:
 ```bash
 ./delete-cluster.sh
 ```
-*   **Mechanics**: Prompts the administrator for an explicit `YES` security confirmation before triggering `eksctl delete cluster`. It safely de-provisions the Amazon EC2 worker nodes, removes associated IAM roles, tears down the cloud virtual network (VPC), and outputs a final green success confirmation once AWS registers the complete infrastructure purge.
+*   **Mechanics**: Triggers `eksctl delete cluster` to de-provision Amazon EC2 worker nodes, remove associated IAM roles, and delete the virtual network (VPC).
 
 ---
 
